@@ -1,0 +1,51 @@
+1. How many Threads are you going to use?
+
+At least 1 for the main controller, one for the current train that is crossing, and also 1 for each station. The main thread for initalizing and acting as the main track, and then 1 more for each station. 
+We will need one "extra" for the current train to replace the thread it is "taking" from the station while it is crossing.   
+
+2. Do the Threads work independently? Or, is there an overall "Controller" thread?
+
+There will be 1 controller thread which will initialize the "train" threads, and manage the crossing of the trains. 
+
+3. How many mutexes are you going to use? Specify the operation each mutex will guard.
+
+I will be using at least 5 mutexes, mainly to manage the main track and the stations. I am under the assumption that only one train can be loaded in each station at any given moment, 
+so there will have to be a mutex (and a convar) to notify each train for when it can be brought to the station to be loaded. So, each station will need a seperate mutex.
+
+4. Will the main thread be idle? If not, what will it be doing?
+
+After initializing the timer and trains, the main thread will be idle unless a train is crossing. If a train is crossing, it will act as the "track", and then go back to being idle. 
+
+5. How are you going to represent stations (which are collections of loaded trains ready to depart)? That is, what type of data structure will you use?
+
+Most likly a linked list would work best, using a train struct type contained in the node to hold all the data. This allows data to not have to be overwritten like if I tried to store it in a fixed length array. 
+I could also use a queue, but that might be a little more complicated then needed.  
+
+6. How are you going to ensure that data structures in your program will not be modified concurrently?
+
+Like I stated above, using a linked list for each station will manage the possiblity of data being modified incorrectly.
+
+7. How many convars are you going to use? For each convar, describe the condition the convar will represent, which mutex is associated with that convar and why, and what operation should be performed once pthread_cond_wait() has been unblocked and re-acquired the mutex?
+
+1.Convar for the status of the main track will definitly be used. The mutex will be the main track, and the operation to be performed when the condition is satisfied is to allow a train to cross. 
+2-5. Convar for each of the stations, assuming only one train can be loaded at a time we will need a convar to notify each thread when a train is ready to be loaded. The mutex for each will be a seperate "load train at station _____",
+and once satisfied should load the train at their specified station. 
+
+8. Briefly sketch the overall algorithm you will use, using sentences. 
+
+1. Read input file, create a train thread for each identified train. 
+
+2. with the list of trains we have identified, add train to each list representing a station based on identification
+
+3. Load train, at most one each station, locking each station mutex.
+
+4. Prepare first loaded train for crossing by releasing its connected station mutex. Lock each station mutex again if there is another train needing to be loaded.
+   If two trains ready at the same time, prepare the highest priority train, with prioriy westbound then eastbound. lock mutex for crossing.
+
+5. Train crosses to other side, unlock mutex, prepare highest priority train on side we just arrived on, lock mutex
+
+6. End the thread for the train that just crossed, clearing its data and allowing it to be used to load at a free station. 
+
+7. repeat steps 4-6 until no trains remain. 
+
+8. End all station threads, then the main thread. done.  
