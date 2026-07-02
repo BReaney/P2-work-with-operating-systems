@@ -4,7 +4,9 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <stdlib.h>
-
+#include <unistd.h>
+//create the needed mutexes
+pthread_mutex_t travel_check;
 
 //helper function to return the priority of the train. 
 int priority(char c){
@@ -18,19 +20,20 @@ int priority(char c){
     return pri;
 }
 //helper to get our direction from input.
-int direction(char c){
-    int dir = 'E';
+void direction(char* c, char p){
+   
 
-    if(c == 'W' || c == 'w'){
-        dir = 'W';
+    if(p == 'W' || p == 'w'){
+        strcpy(c, "West");
+    }else if(p == 'E' || p == 'e'){
+        strcpy(c, "East");
     }
 
-    return dir;
 }
 
 typedef struct Train{
     int Number;
-    int Direction;
+    char Direction[5];
     int Priority;
     int Loading;
     int Crossing;
@@ -51,10 +54,10 @@ typedef struct Queue{
 
 
 //helper to make a new train
-Train new_Train(Train T, int N, int D, int P, int L, int C){
+Train new_Train(Train T, int N, char* D, int P, int L, int C){
 
     T.Number = N;
-    T.Direction = D;
+    strcpy(T.Direction, D);
     T.Priority = P;
     T.Loading = L;
     T.Crossing = C;
@@ -143,19 +146,44 @@ void print_queue(Queue *Q){
     Node *cur = Q->front;
     printf("This is station %c\n", Q->location);
     while(cur != NULL){
-        printf("%d, %d, %d, %d, %d \n", cur->Train.Number, cur->Train.Direction, cur->Train.Priority, cur->Train.Loading, cur->Train.Crossing);
+        printf("%d, %s, %d, %d, %d \n", cur->Train.Number, cur->Train.Direction, cur->Train.Priority, cur->Train.Loading, cur->Train.Crossing);
         cur = cur->next;
     }
 }
 
+void* cross_track(void* arg){
+    pthread_mutex_lock(&travel_check);
+    Train *cur = arg;
+    printf("Train %2d is ON the main track going %4s\n", cur->Number, cur->Direction);
+    usleep(cur->Crossing);
+    printf("Train %2d is OFF the main track after going %4s\n", cur->Number, cur->Direction);
+    pthread_mutex_lock(&travel_check);
+    pthread_exit(NULL);
+    return NULL;
+}
+
+void* load_train(void* arg){
+    Queue *Q = arg;
+    Train cur = Q->front->Train;
+
+
+
+
+
+}
+
 int main(int argc, char*argv[]){
 
+//initialize travel mutex
+pthread_mutex_init(&travel_check, NULL);
 
+//make pthread variable for crossing.
+pthread_t cross;
 
 FILE* input = fopen("input.txt", "r");
 
-char cur_N = 0;
-char cur_D;
+int cur_N = 0;
+char cur_D[5];
 char cur_P;
 int cur_L;
 int cur_C;
@@ -181,14 +209,14 @@ while(notice == 0){
         break;
     }
    
-    cur_D = direction(cur_P);
+    direction(cur_D, cur_P);
     cur_P = priority(cur_P);
 
     
     cur_T = new_Train(cur_T,cur_N,cur_D,cur_P,cur_L,cur_C);
     cur_N++;
      
-    if(cur_D == 'E'){
+    if(cur_D[0] == 'E'){
         if(cur_P == 1){
 
             enqueue(HEB,cur_T);
@@ -197,7 +225,7 @@ while(notice == 0){
         }
         
         
-    }else if(cur_D == 'W'){
+    }else if(cur_D[0] == 'W'){
          if(cur_P == 1){
            
             enqueue(HWB,cur_T);
